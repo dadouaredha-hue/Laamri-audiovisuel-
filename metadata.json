@@ -1,0 +1,6 @@
+{
+  "name": "AV Equipment & Financial Manager",
+  "description": "Comprehensive AV gear rental, sales, inventory, and multi-currency financial tracking system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
