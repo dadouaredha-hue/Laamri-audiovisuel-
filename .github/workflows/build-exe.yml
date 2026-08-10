@@ -22,9 +22,12 @@ jobs:
           node-version: 20
 
       - name: Install Dependencies
+        shell: powershell
         run: |
-          npm install
-          npm install @rollup/rollup-win32-x64-msvc @esbuild/win32-x64
+          if (Test-Path package-lock.json) { Remove-Item package-lock.json -Force }
+          if (Test-Path node_modules) { Remove-Item -Recurse -Force node_modules }
+          npm install --include=optional
+          npm install @rollup/rollup-win32-x64-msvc @esbuild/win32-x64 --no-save --force
 
       - name: Build Web Application
         run: npm run build
