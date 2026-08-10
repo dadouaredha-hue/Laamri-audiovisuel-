@@ -32,7 +32,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Artifacts to Release
+      - name: Upload Executable Artifacts (Always)
+        uses: actions/upload-artifact@v4
+        with:
+          name: AV-GEAR-PRO-Windows-EXE
+          path: dist_electron/*.exe
+
+      - name: Upload Artifacts to Release (On Release / Tag)
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
         with:
