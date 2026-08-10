@@ -1,21 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Settings,
   Moon,
   Sun,
   RotateCcw,
   Download,
+  Upload,
   CheckCircle2,
   Building,
   ShieldAlert,
+  AlertTriangle,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export const SettingsView: React.FC = () => {
-  const { settings, updateSettings, resetAllData, products, transactions, rates } = useApp();
+  const { settings, updateSettings, resetAllData, products, transactions, rates, stockLogs, importBackupData } = useApp();
 
   const [toastMessage, setToastMessage] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const [showConfirmReset, setShowConfirmReset] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleBackupExport = () => {
     const backupData = {
@@ -25,6 +29,7 @@ export const SettingsView: React.FC = () => {
       transactions,
       rates,
       settings,
+      stockLogs,
     };
 
     const dataStr =
@@ -41,6 +46,30 @@ export const SettingsView: React.FC = () => {
 
     setToastMessage('Sauvegarde complète téléchargée avec succès !');
     setTimeout(() => setToastMessage(''), 3000);
+  };
+
+  const handleBackupImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        const success = importBackupData(json);
+        if (success) {
+          setToastMessage('Sauvegarde restaurée avec succès !');
+          setErrorMessage('');
+        } else {
+          setErrorMessage('Format de fichier de sauvegarde non valide.');
+        }
+      } catch (err) {
+        setErrorMessage('Erreur lors de la lecture du fichier JSON.');
+      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setTimeout(() => setToastMessage(''), 3000);
+    };
+    reader.readAsText(file);
   };
 
   const handleReset = () => {
@@ -71,6 +100,13 @@ export const SettingsView: React.FC = () => {
           <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-md text-xs font-bold flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
             <span>{toastMessage}</span>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="mt-4 p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-md text-xs font-bold flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" />
+            <span>{errorMessage}</span>
           </div>
         )}
 
@@ -200,20 +236,36 @@ export const SettingsView: React.FC = () => {
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 bg-zinc-950 rounded-md border border-zinc-800 space-y-2">
+            <div className="p-4 bg-zinc-950 rounded-md border border-zinc-800 space-y-3">
               <p className="text-xs font-bold text-zinc-200">
-                Sauvegarde Fichier JSON
+                Sauvegarde & Restauration JSON
               </p>
               <p className="text-[11px] text-zinc-500">
-                Exporter l'intégralité des produits, taux et transactions dans un fichier JSON local.
+                Exporter ou importer l'intégralité des produits, taux et transactions.
               </p>
-              <button
-                onClick={handleBackupExport}
-                className="w-full bg-zinc-900 hover:bg-zinc-800 text-zinc-200 py-2 rounded-md text-xs font-bold border border-zinc-700 transition flex items-center justify-center space-x-2"
-              >
-                <Download className="w-4 h-4 text-emerald-400" />
-                <span>Exporter Sauvegarde (.json)</span>
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={handleBackupExport}
+                  className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 py-2 rounded-md text-xs font-bold border border-zinc-700 transition flex items-center justify-center space-x-1.5"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Exporter</span>
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleBackupImport}
+                  accept=".json"
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 py-2 rounded-md text-xs font-bold border border-zinc-700 transition flex items-center justify-center space-x-1.5"
+                >
+                  <Upload className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Importer</span>
+                </button>
+              </div>
             </div>
 
             <div className="p-4 bg-rose-500/5 rounded-md border border-rose-500/20 space-y-2">

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Camera } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ProductCategory } from '../../types';
+import { PRODUCT_CATEGORIES } from '../../constants/categories';
 
 export const ProductModal: React.FC = () => {
   const {
@@ -110,16 +111,7 @@ export const ProductModal: React.FC = () => {
     setEditingProduct(null);
   };
 
-  const categories: ProductCategory[] = [
-    'Boitier',
-    'Objectif',
-    'Eclairage',
-    'Son',
-    'Drone',
-    'Accessoire',
-    'Ecran & Transmetteur',
-    'Divers',
-  ];
+  const categories = PRODUCT_CATEGORIES;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">

@@ -46,6 +46,8 @@ interface AppContextType {
   updateSettings: (newSettings: Partial<SystemSettings>) => void;
   
   addTransaction: (tx: Omit<Transaction, 'id'>) => void;
+  returnRental: (transactionId: string) => void;
+  importBackupData: (data: any) => boolean;
   resetAllData: () => void;
   
   // Formatters & Helpers
@@ -67,6 +69,8 @@ interface AppContextType {
 
   isTransactionModalOpen: boolean;
   setIsTransactionModalOpen: (open: boolean) => void;
+  transactionTargetProduct: Product | null;
+  setTransactionTargetProduct: (product: Product | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -92,6 +96,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [stockTargetProduct, setStockTargetProduct] = useState<Product | null>(null);
 
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [transactionTargetProduct, setTransactionTargetProduct] = useState<Product | null>(null);
 
   // Initialize state from LocalStorage or initial defaults
   const [products, setProducts] = useState<Product[]>(() => {
@@ -190,11 +195,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
+  const generateNextCode = () => {
+    const year = new Date().getFullYear();
+    const maxNum = products.reduce((max, p) => {
+      const match = p.code?.match(/AV-\d+-(\d+)/) || p.code?.match(/AV-(\d+)/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        return num > max ? num : max;
+      }
+      return max;
+    }, 0);
+    return `AV-${year}-${String(maxNum + 1).padStart(3, '0')}`;
+  };
+
   const addProduct = (
     inputData: Omit<Product, 'id' | 'code' | 'profitDZD' | 'profitMarginPercent' | 'totalCostCNY' | 'totalCostDZD' | 'sellingPriceCNY' | 'rentalPriceDayCNY'>
   ) => {
-    const id = `prod-${Date.now()}`;
-    const code = `AV-${Math.floor(1000 + Math.random() * 9000)}`;
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID ? `prod-${crypto.randomUUID()}` : `prod-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const code = generateNextCode();
     const metrics = computeProductMetrics(
       inputData.purchasePriceCNY,
       inputData.shippingFeesCNY,
@@ -254,26 +272,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const adjustStock = (productId: string, quantityChange: number, reason: string) => {
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (p.id !== productId) return p;
-        const newStock = Math.max(0, p.stockQuantity + quantityChange);
-        
-        // Log the change
-        const newLog: StockLog = {
-          id: `log-${Date.now()}`,
-          productId: p.id,
-          productName: p.name,
-          date: new Date().toISOString().split('T')[0],
-          type: quantityChange > 0 ? 'Entrée' : quantityChange < 0 ? 'Sortie' : 'Ajustement',
-          quantityChange,
-          newStock,
-          reason,
-        };
-        setStockLogs((logs) => [newLog, ...logs]);
+    const target = products.find((p) => p.id === productId);
+    if (!target) return;
 
-        return { ...p, stockQuantity: newStock };
-      })
+    const newStock = Math.max(0, target.stockQuantity + quantityChange);
+    const logId = typeof crypto !== 'undefined' && crypto.randomUUID ? `log-${crypto.randomUUID()}` : `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+    const newLog: StockLog = {
+      id: logId,
+      productId: target.id,
+      productName: target.name,
+      date: new Date().toISOString().split('T')[0],
+      type: quantityChange > 0 ? 'Entrée' : quantityChange < 0 ? 'Sortie' : 'Ajustement',
+      quantityChange,
+      newStock,
+      reason,
+    };
+
+    setStockLogs((logs) => [newLog, ...logs]);
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, stockQuantity: newStock } : p))
     );
   };
 
@@ -308,10 +326,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addTransaction = (tx: Omit<Transaction, 'id'>) => {
+    const txId = typeof crypto !== 'undefined' && crypto.randomUUID ? `trx-${crypto.randomUUID()}` : `trx-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    
+    let rentalStartDate = tx.rentalStartDate;
+    let rentalDueDate = tx.rentalDueDate;
+    let rentalStatus = tx.rentalStatus;
+
+    if (tx.type === 'Location') {
+      const today = new Date();
+      rentalStartDate = rentalStartDate || today.toISOString().split('T')[0];
+      if (tx.rentalDays && !rentalDueDate) {
+        const due = new Date(today);
+        due.setDate(due.getDate() + tx.rentalDays);
+        rentalDueDate = due.toISOString().split('T')[0];
+      }
+      rentalStatus = rentalStatus || 'En cours';
+    }
+
     const newTx: Transaction = {
       ...tx,
-      id: `trx-${Date.now()}`,
+      id: txId,
+      rentalStartDate,
+      rentalDueDate,
+      rentalStatus,
     };
+
     setTransactions((prev) => [newTx, ...prev]);
 
     // Update stock & counters automatically
@@ -325,10 +364,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else if (tx.type === 'Achat') {
         adjustStock(tx.productId, tx.quantity, `Achat fournisseur ${tx.clientOrSupplier}`);
       } else if (tx.type === 'Location') {
+        adjustStock(tx.productId, -tx.quantity, `Location (${tx.rentalDays || 1}j) à ${tx.clientOrSupplier}`);
         updateProduct(tx.productId, {
           totalRentalsCount: (prod.totalRentalsCount || 0) + tx.quantity,
         });
       }
+    }
+  };
+
+  const returnRental = (transactionId: string) => {
+    const tx = transactions.find((t) => t.id === transactionId);
+    if (!tx || tx.type !== 'Location' || tx.rentalStatus === 'Retourné') return;
+
+    setTransactions((prev) =>
+      prev.map((t) => (t.id === transactionId ? { ...t, rentalStatus: 'Retourné' } : t))
+    );
+
+    // Restore stock
+    adjustStock(
+      tx.productId,
+      tx.quantity,
+      `Retour de location (${tx.productName}) par ${tx.clientOrSupplier}`
+    );
+  };
+
+  const importBackupData = (backup: any): boolean => {
+    try {
+      if (!backup || typeof backup !== 'object') return false;
+      if (Array.isArray(backup.products)) {
+        setProducts(backup.products);
+      }
+      if (Array.isArray(backup.transactions)) {
+        setTransactions(backup.transactions);
+      }
+      if (backup.rates && typeof backup.rates === 'object') {
+        setRates(backup.rates);
+      }
+      if (backup.settings && typeof backup.settings === 'object') {
+        setSettings(backup.settings);
+      }
+      if (Array.isArray(backup.stockLogs)) {
+        setStockLogs(backup.stockLogs);
+      }
+      return true;
+    } catch (err) {
+      console.error('Erreur lors de l’importation de la sauvegarde:', err);
+      return false;
     }
   };
 
@@ -391,6 +472,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateRates,
       updateSettings,
       addTransaction,
+      returnRental,
+      importBackupData,
       resetAllData,
       formatDZD,
       formatCNY,
@@ -406,6 +489,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setStockTargetProduct,
       isTransactionModalOpen,
       setIsTransactionModalOpen,
+      transactionTargetProduct,
+      setTransactionTargetProduct,
     }),
     [
       activeTab,
@@ -421,6 +506,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isStockModalOpen,
       stockTargetProduct,
       isTransactionModalOpen,
+      transactionTargetProduct,
     ]
   );
 

@@ -12,6 +12,7 @@ import {
   ArrowUpDown,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { PRODUCT_CATEGORIES } from '../constants/categories';
 
 export const ProductsView: React.FC = () => {
   const {
@@ -27,23 +28,15 @@ export const ProductsView: React.FC = () => {
     setIsStockModalOpen,
     setStockTargetProduct,
     setIsTransactionModalOpen,
+    setTransactionTargetProduct,
   } = useApp();
 
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [sortBy, setSortBy] = useState<'name' | 'profit' | 'cost' | 'stock'>('profit');
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
 
-  const categories: string[] = [
-    'All',
-    'Boitier',
-    'Objectif',
-    'Eclairage',
-    'Son',
-    'Drone',
-    'Accessoire',
-    'Ecran & Transmetteur',
-    'Divers',
-  ];
+  const categories: string[] = ['All', ...PRODUCT_CATEGORIES];
 
   const filteredProducts = useMemo(() => {
     return products
@@ -344,6 +337,7 @@ export const ProductsView: React.FC = () => {
 
                   <button
                     onClick={() => {
+                      setTransactionTargetProduct(p);
                       setIsTransactionModalOpen(true);
                     }}
                     className="flex items-center space-x-1 bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded text-[11px] font-semibold transition"
@@ -409,16 +403,38 @@ export const ProductsView: React.FC = () => {
                       <div className="flex items-center justify-end space-x-1">
                         <button
                           onClick={() => {
+                            setStockTargetProduct(p);
+                            setIsStockModalOpen(true);
+                          }}
+                          className="p-1.5 rounded bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition"
+                          title="Ajuster le stock"
+                        >
+                          <Boxes className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setTransactionTargetProduct(p);
+                            setIsTransactionModalOpen(true);
+                          }}
+                          className="p-1.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition"
+                          title="Transaction rapide"
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
                             setEditingProduct(p);
                             setIsProductModalOpen(true);
                           }}
-                          className="p-1.5 rounded bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                          className="p-1.5 rounded bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition"
+                          title="Modifier"
                         >
                           <Edit className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => deleteProduct(p.id)}
-                          className="p-1.5 rounded bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
+                          className="p-1.5 rounded bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition"
+                          title="Supprimer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

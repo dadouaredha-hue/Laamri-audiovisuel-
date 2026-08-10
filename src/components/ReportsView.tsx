@@ -97,6 +97,14 @@ export const ReportsView: React.FC = () => {
     }));
   }, [products]);
 
+  const sanitizeCsvField = (value: string | number) => {
+    const s = String(value);
+    if (/^[=+\-@]/.test(s)) {
+      return `'${s}`;
+    }
+    return s;
+  };
+
   // CSV Export Handler
   const exportProductsToCSV = () => {
     const headers = [
@@ -117,10 +125,10 @@ export const ReportsView: React.FC = () => {
     ];
 
     const rows = products.map((p) => [
-      p.code,
-      `"${p.name.replace(/"/g, '""')}"`,
-      p.brand,
-      p.category,
+      sanitizeCsvField(p.code),
+      `"${sanitizeCsvField(p.name).replace(/"/g, '""')}"`,
+      sanitizeCsvField(p.brand),
+      sanitizeCsvField(p.category),
       p.purchasePriceCNY,
       p.shippingFeesCNY,
       p.totalCostCNY,
@@ -130,7 +138,7 @@ export const ReportsView: React.FC = () => {
       p.profitDZD,
       p.profitMarginPercent.toFixed(2),
       p.stockQuantity,
-      `"${p.supplier.replace(/"/g, '""')}"`,
+      `"${sanitizeCsvField(p.supplier).replace(/"/g, '""')}"`,
     ]);
 
     const csvContent =
@@ -162,16 +170,16 @@ export const ReportsView: React.FC = () => {
     ];
 
     const rows = transactions.map((t) => [
-      t.id,
+      sanitizeCsvField(t.id),
       t.date,
       t.type,
-      `"${t.productName.replace(/"/g, '""')}"`,
+      `"${sanitizeCsvField(t.productName).replace(/"/g, '""')}"`,
       t.quantity,
       t.unitPriceDZD,
       t.unitPriceCNY,
       t.totalAmountDZD,
       t.totalAmountCNY,
-      `"${t.clientOrSupplier.replace(/"/g, '""')}"`,
+      `"${sanitizeCsvField(t.clientOrSupplier).replace(/"/g, '""')}"`,
       t.status,
     ]);
 

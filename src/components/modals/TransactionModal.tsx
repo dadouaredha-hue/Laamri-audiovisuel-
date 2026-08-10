@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Zap, ArrowRight } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { TransactionType } from '../../types';
@@ -7,6 +7,8 @@ export const TransactionModal: React.FC = () => {
   const {
     isTransactionModalOpen,
     setIsTransactionModalOpen,
+    transactionTargetProduct,
+    setTransactionTargetProduct,
     products,
     addTransaction,
     formatDZD,
@@ -16,13 +18,32 @@ export const TransactionModal: React.FC = () => {
 
   const [type, setType] = useState<TransactionType>('Vente');
   const [selectedProductId, setSelectedProductId] = useState<string>(
-    products[0]?.id || ''
+    transactionTargetProduct?.id || products[0]?.id || ''
   );
   const [quantity, setQuantity] = useState<number>(1);
   const [rentalDays, setRentalDays] = useState<number>(1);
   const [clientOrSupplier, setClientOrSupplier] = useState<string>('');
 
+  useEffect(() => {
+    if (isTransactionModalOpen) {
+      if (transactionTargetProduct) {
+        setSelectedProductId(transactionTargetProduct.id);
+      } else if (products.length > 0) {
+        setSelectedProductId(products[0].id);
+      }
+      setQuantity(1);
+      setRentalDays(1);
+      setClientOrSupplier('');
+      setErrorMsg('');
+    }
+  }, [isTransactionModalOpen, transactionTargetProduct, products]);
+
   if (!isTransactionModalOpen) return null;
+
+  const handleClose = () => {
+    setIsTransactionModalOpen(false);
+    setTransactionTargetProduct(null);
+  };
 
   const product = products.find((p) => p.id === selectedProductId) || products[0];
 
@@ -36,9 +57,18 @@ export const TransactionModal: React.FC = () => {
   const totalDZD = type === 'Location' ? unitPriceDZD * quantity * rentalDays : unitPriceDZD * quantity;
   const totalCNY = toCNY(totalDZD);
 
+  const [errorMsg, setErrorMsg] = useState<string>('');
+
+  const isStockInsufficient = (type === 'Vente' || type === 'Location') && product && quantity > product.stockQuantity;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!product) return;
+
+    if (isStockInsufficient) {
+      setErrorMsg(`Stock insuffisant ! Unités disponibles: ${product.stockQuantity}`);
+      return;
+    }
 
     addTransaction({
       date: new Date().toISOString().split('T')[0],
@@ -57,6 +87,7 @@ export const TransactionModal: React.FC = () => {
     });
 
     setIsTransactionModalOpen(false);
+    setTransactionTargetProduct(null);
   };
 
   return (
@@ -68,7 +99,7 @@ export const TransactionModal: React.FC = () => {
             <h3 className="font-bold text-sm">Nouvelle Transaction Rapide</h3>
           </div>
           <button
-            onClick={() => setIsTransactionModalOpen(false)}
+            onClick={handleClose}
             className="p-1 rounded bg-zinc-900 text-zinc-400 hover:text-zinc-100 border border-zinc-800"
           >
             <X className="w-4 h-4" />
@@ -76,6 +107,11 @@ export const TransactionModal: React.FC = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
+          {(errorMsg || isStockInsufficient) && (
+            <div className="p-2.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-md font-semibold text-[11px] flex items-center justify-between">
+              <span>⚠️ Stock disponible insuffisant ({product?.stockQuantity || 0} en stock)</span>
+            </div>
+          )}
           {/* Type Buttons */}
           <div className="grid grid-cols-3 gap-2">
             <button
@@ -185,7 +221,7 @@ export const TransactionModal: React.FC = () => {
           <div className="pt-2 border-t border-zinc-800 flex justify-end space-x-2">
             <button
               type="button"
-              onClick={() => setIsTransactionModalOpen(false)}
+              onClick={handleClose}
               className="px-3.5 py-1.5 rounded-full font-semibold bg-zinc-950 text-zinc-400 hover:text-zinc-200 border border-zinc-800"
             >
               Annuler

@@ -32,6 +32,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { KPICard } from './KPICard';
 import { Product, ProductCategory } from '../types';
+import { PRODUCT_CATEGORIES } from '../constants/categories';
 
 export const DashboardView: React.FC = () => {
   const {
@@ -48,12 +49,43 @@ export const DashboardView: React.FC = () => {
     setIsStockModalOpen,
     setStockTargetProduct,
     setIsTransactionModalOpen,
+    setTransactionTargetProduct,
+    returnRental,
     setActiveTab,
   } = useApp();
 
   // Selected table category filter
   const [tableCategory, setTableCategory] = useState<string>('All');
   const [stockStatusFilter, setStockStatusFilter] = useState<string>('All');
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+
+  // Month-over-month sales trend calculation
+  const realSalesTrend = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    let currentMonthTotal = 0;
+    let lastMonthTotal = 0;
+
+    transactions.forEach((t) => {
+      if (t.status !== 'Payé') return;
+      const tDate = new Date(t.date);
+      if (isNaN(tDate.getTime())) return;
+
+      if (tDate.getFullYear() === currentYear && tDate.getMonth() === currentMonth) {
+        currentMonthTotal += t.totalAmountDZD;
+      } else if (
+        (currentMonth === 0 && tDate.getFullYear() === currentYear - 1 && tDate.getMonth() === 11) ||
+        (tDate.getFullYear() === currentYear && tDate.getMonth() === currentMonth - 1)
+      ) {
+        lastMonthTotal += t.totalAmountDZD;
+      }
+    });
+
+    if (lastMonthTotal === 0) return undefined;
+    return Number((((currentMonthTotal - lastMonthTotal) / lastMonthTotal) * 100).toFixed(1));
+  }, [transactions]);
 
   // KPI Calculations
   const metrics = useMemo(() => {
@@ -182,8 +214,8 @@ export const DashboardView: React.FC = () => {
           title="CA Potentiel"
           cnyValue={metrics.totalPotentialRevenueCNY}
           dzdValue={metrics.totalPotentialRevenueDZD}
-          trendPercent={14.8}
-          trendLabel="Valeur Vente Totale"
+          trendPercent={realSalesTrend}
+          trendLabel={realSalesTrend !== undefined ? "Évolution vs mois dernier" : "Valeur Vente Totale"}
           icon={TrendingUp}
         />
 
@@ -192,7 +224,6 @@ export const DashboardView: React.FC = () => {
           cnyValue={0}
           dzdValue={metrics.totalProfitDZD}
           formattedPrimary={formatDZD(metrics.totalProfitDZD)}
-          trendPercent={28.5}
           trendLabel="Marge nette globale"
           icon={DollarSign}
         />
@@ -534,6 +565,7 @@ export const DashboardView: React.FC = () => {
                           {/* Record Transaction */}
                           <button
                             onClick={() => {
+                              setTransactionTargetProduct(p);
                               setIsTransactionModalOpen(true);
                             }}
                             className="p-1.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition"

@@ -60,6 +60,9 @@ export interface Transaction {
   clientOrSupplier: string;
   status: 'Payé' | 'En attente' | 'Annulé';
   rentalDays?: number;
+  rentalStartDate?: string;
+  rentalDueDate?: string;
+  rentalStatus?: 'En cours' | 'Retourné' | 'En retard';
   notes?: string;
 }
 
